@@ -1,7 +1,7 @@
 Lesson 3.1: API Calls, Functions, and Iterations
 ================
 Katie Willi
-2023-01-27
+2023-02-06
 
 ### Lesson Objectives
 
@@ -25,6 +25,8 @@ console! To work with APIs, we will need to use two new packages:
 formats, JSON. Let’s go ahead and load in our packages for this lesson:
 
 ``` r
+#install.packages("jsonlite")
+#install.packages("httr")
 library(tidyverse)
 library(httr)
 library(jsonlite)
@@ -86,7 +88,7 @@ raw_data # lists 'UTF-8'
 ```
 
     ## Response [https://irmaservices.nps.gov/v3/rest/stats/total/1992]
-    ##   Date: 2023-01-27 21:05
+    ##   Date: 2023-02-06 19:25
     ##   Status: 200
     ##   Content-Type: application/json; charset=utf-8
     ##   Size: 1.42 kB
@@ -122,6 +124,22 @@ API! 😁
 **Using the code above as a starting point, pull in monthly NPS-wide
 visitation data for the years 1980, 1999, and 2018.**
 
+``` r
+raw_data80 <- httr::GET(url = "https://irmaservices.nps.gov/v3/rest/stats/total/1980")
+raw_data99 <- httr::GET(url = "https://irmaservices.nps.gov/v3/rest/stats/total/1999")
+raw_data18 <- httr::GET(url = "https://irmaservices.nps.gov/v3/rest/stats/total/2018")
+
+unpacked_data80 <- httr::content(raw_data80, as = "text", encoding = "UTF-8") 
+unpacked_data99 <- httr::content(raw_data99, as = "text", encoding = "UTF-8")
+unpacked_data18 <- httr::content(raw_data18, as = "text", encoding = "UTF-8")
+
+final_dataex1 <- list(
+final_data80 <- jsonlite::fromJSON(unpacked_data80),
+final_data99 <- jsonlite::fromJSON(unpacked_data99),
+final_data18 <- jsonlite::fromJSON(unpacked_data18)
+)
+```
+
 ### Exercise \#2
 
 **Now, let’s explore the second NPS visitation data set,
@@ -131,6 +149,12 @@ Use your new API skills to pull in visitation data for Rocky Mountain
 National Park from 2010 through 2021, based on the API’s URL template.
 The unit code for Rocky Mountain National Park is ROMO. (Hint: an API
 URL can have multiple sections that need to be updated by the user.)**
+
+``` r
+raw_ex2 <- httr::GET(url = "https://irmaservices.nps.gov/v3/rest/stats/visitation?unitCodes=ROMO&startMonth=1&startYear=2010&endMonth=12&endYear=2021")
+unpacked_dataex2 <- httr::content(raw_ex2, as = "text", encoding = "UTF-8") 
+ex2_final <-jsonlite::fromJSON(unpacked_dataex2)
+```
 
 # Functions
 
@@ -201,6 +225,8 @@ extracted_data <- httr::content(raw_data, as = "text", encoding = "UTF-8")
 # parse text from JSON to data frame
 final_data <- jsonlite::fromJSON(extracted_data)
 
+
+
 return(final_data)
 
 }
@@ -246,11 +272,38 @@ spreadsheet](https://www.nps.gov/aboutus/foia/upload/NPS-Unit-List.xlsx).
 (Hint 1: functions can have multiple arguments. Hint 2: what’s the
 difference between `05` and `"05"`?)**
 
+``` r
+unit_visitation <- function(UNITCODES,STARTMONTH,STARTYEAR,ENDMONTH,ENDYEAR){
+
+# pull in the data
+raw <-  httr::GET(url = paste0("https://irmaservices.nps.gov/v3/rest/stats/visitation?unitCodes=",UNITCODES,"&startMonth=",STARTMONTH,"&startYear=",STARTYEAR,"&endMonth=",ENDMONTH,"&endYear=",ENDYEAR))
+
+# convert content to text
+extracted_data <- httr::content(raw, as = "text", encoding = "UTF-8") 
+
+# parse text from JSON to data frame
+final_data <- jsonlite::fromJSON(extracted_data)
+
+
+return(final_data)
+
+}
+
+##test it out with RMNP data
+test<-unit_visitation("ROMO",1,'2010',12,'2022')
+```
+
 ### Exercise \#4
 
 **Using `unit_visitation()`, pull in visitation data for Rocky Mountain
 National Park (ROMO), Everglades National Park (EVER), and Theodore
 Roosevelt National Park (THRO) from 1990 through 2021.**
+
+``` r
+RMNP <- unit_visitation("ROMO",1,'1990',12,'2021')
+ENP <- unit_visitation("EVER",1,'1990',12,'2021')
+TRNP <- unit_visitation("THRO",1,'1990',12,'2021')
+```
 
 ## Function Defaults
 
@@ -312,6 +365,27 @@ starting and ending months to January and December, respectively. This
 way, we are automatically pulling in data for entire years. Rerun the
 function for ROMO, EVER, and THRO for the 1980-2021 time period to make
 sure it works properly.**
+
+``` r
+unit_visitation <- function(UNITCODES,STARTMONTH =1,STARTYEAR,ENDMONTH=12,ENDYEAR){
+
+# pull in the data
+raw <-  httr::GET(url = paste0("https://irmaservices.nps.gov/v3/rest/stats/visitation?unitCodes=",UNITCODES,"&startMonth=",STARTMONTH,"&startYear=",STARTYEAR,"&endMonth=",ENDMONTH,"&endYear=",ENDYEAR))
+
+# convert content to text
+extracted_data <- httr::content(raw, as = "text", encoding = "UTF-8") 
+
+# parse text from JSON to data frame
+final_data <- jsonlite::fromJSON(extracted_data)
+
+
+return(final_data)
+
+}
+
+##let's try it
+test1 <- unit_visitation("GLAC",STARTYEAR = '1990',ENDYEAR = '2022')
+```
 
 # Iterations
 
@@ -396,6 +470,20 @@ Then, create a single data frame containing each park units’ output.
 (Hint: Your first step will be to create a vector listing each park
 unit.)**
 
+``` r
+parks <- c("ROMO", "EVER", "THRO")
+output_vis <- vector("list", length = length(parks))
+
+for(i in 1:length(parks)){
+  
+  output_vis[[i]] <-
+    unit_visitation(UNITCODES = parks[i],STARTYEAR = 1980,ENDYEAR = 2021)
+  
+}
+
+multi_parks <- dplyr::bind_rows(output_vis)
+```
+
 ## Mapping
 
 The `tidyverse`’s `purrr` package has its own iteration function,
@@ -437,3 +525,12 @@ multi_years <- bind_rows(output_map)
 **Use `map()` to run `unit_visitation()` with arguments
 `start_year = 1980` and `end_year = 2021` across ROMO, EVER, and THRO.
 Then, create a single data frame containing each park units’ output.**
+
+``` r
+output_map_vis <- parks %>% 
+  map(~ unit_visitation(UNITCODES =., STARTYEAR = 1980,ENDYEAR=2021))
+
+identical(output_vis,output_map_vis)
+```
+
+    ## [1] TRUE

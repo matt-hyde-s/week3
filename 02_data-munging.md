@@ -1,7 +1,7 @@
 3.2: Data Munging and Visualization
 ================
 Katie Willi
-2023-01-27
+2023-02-06
 
 ### Lesson Objectives
 
@@ -19,6 +19,7 @@ There are **five exercises** in this lesson that must be completed.
 library(tidyverse)
 library(httr)
 library(jsonlite)
+#install.packages("plotly")
 library(plotly)
 library(scales)
 ```
@@ -56,6 +57,13 @@ parkwide <- years %>%
 mapping, pull visitor data from 1980-2021 for the following park units:
 ROMO, ACAD, LAKE, YELL, GRCA, ZION, OLYM, and GRSM. Name the final
 output `units`.**
+
+``` r
+parks <- c("ROMO", "ACAD", "LAKE", "YELL", "GRCA", "ZION", "OLYM", "GRSM")
+units <- parks %>%
+  map(~ unit_visitation(UNITCODES =., STARTYEAR = 1980,ENDYEAR=2021)) %>%
+  bind_rows()
+```
 
 ## Exploring our data
 
@@ -139,6 +147,25 @@ plotly::ggplotly(
 park-wide visitation, the other showing all the individual park units
 together. Both panes should have different y-axes.**
 
+``` r
+yearly <- yearly %>%
+  mutate(binary = ifelse(UnitCode =="Parkwide",0,1))
+head(yearly)
+
+plotly::ggplotly(
+  ggplot(data=yearly) +
+    geom_point(aes(x = Year, y = RecVisitation, color = UnitCode)) +
+    geom_path(aes(x = Year, y = RecVisitation, color = UnitCode)) +
+    scale_y_continuous(labels = scales::label_scientific()) +
+    facet_wrap(~binary, scales = "free_y", nrow=2)+
+    theme_bw(base_size=10)
+)
+
+
+
+#facet_wrap : create a binary column to split those up within the dataframe 
+```
+
 It is pretty clear that some park units get orders of magnitude more
 visitors than others. But just how much of the total park visitation do
 each of these parks account for from year to year? Here we walk through
@@ -182,6 +209,26 @@ the column(s) you DON’T want to gather), while `names_to` and
 series plot showing the annual percentage of the total visitation made
 up by all park units.**
 
+``` r
+new_data <- wide_data %>%
+  pivot_longer(cols = -Year & -Parkwide,
+               names_to = "Park",
+               values_to = "RecVisitation")
+
+percent <-new_data %>%
+  mutate(RecVisitation/Parkwide*100)
+
+
+percent$`RecVisitation/Parkwide * 100`
+plotly::ggplotly(
+  ggplot(data=percent) +
+    geom_point(aes(x = Year, y = `RecVisitation/Parkwide * 100`, color = Park)) +
+    geom_path(aes(x = Year, y = `RecVisitation/Parkwide * 100`, color = Park)) +
+    scale_y_continuous(labels = scales::label_scientific()) +
+    theme_bw(base_size=10)
+)
+```
+
 ## Joining
 
 Another way of getting park-wide visitation side-by-side with the park
@@ -189,7 +236,7 @@ unit data is through the use of joining our original `units` and
 `parkwide` data sets:
 
 ``` r
-joined_data <- inner_join(x = units, y = parkwide, by = c("Year","Month"))
+joined_data <- inner_join(units, parkwide, by = c("Year","Month"))
 ```
 
 … where `x` and `y` are the two data sets you want joined, and `by`
@@ -204,8 +251,35 @@ series plot showing the annual percentage of the total visitation made
 up by all park units. This plot should look nearly identical to the
 previous plot.**
 
+``` r
+data <- joined_data %>%
+  group_by(UnitCode.x, Year) %>%
+  summarize(unitVisitation = sum(RecreationVisitors.x),
+            parkVisitation = sum(RecreationVisitors.y)) %>%
+  mutate(data = (unitVisitation/parkVisitation)*100)
+
+
+plotly::ggplotly(
+  ggplot(data=data) +
+    geom_point(aes(x = Year, y = data, color = UnitCode.x)) +
+    geom_path(aes(x = Year, y = data, color = UnitCode.x)) +
+    scale_y_continuous(labels = scales::label_scientific()) +
+    theme_bw(base_size=10)
+)
+```
+
 ### Exercise \#5
 
 **Which park on average has the most visitation? Which park has the
 least visitation? Base your response on the data starting in 1990,
 ending in 2021. Defend your answer with numbers!**
+
+``` r
+ex5 <- data %>%
+  filter(Year >= 1990) %>%
+  summarise(data1 = mean(data)) ## data is the my column from the previous exercise that has the unit visitation
+
+
+
+##highest visitation is GRSM is 3.5% on average and Acadia has .93%
+```
